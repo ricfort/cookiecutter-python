@@ -1,0 +1,50 @@
+parameters:
+  - name: pypi_private_url
+    type: string
+  - name: pypi_private_user_name
+    type: string
+  - name: pypi_private_user_pat
+    type: string
+
+steps:
+  - task: Cache@2
+    inputs:
+      key: 'pip | "$(Agent.OS)"'
+      restoreKeys: |
+        pip | "$(Agent.OS)"
+      path: $(Pipeline.Workspace)/.cache-pip
+    displayName: Cache pip packages
+  - task: Cache@2
+    inputs:
+      key: 'poetry-venv | "$(Agent.OS)" | poetry.lock'
+      restoreKeys: |
+        poetry | "$(Agent.OS)"
+      path: $(Build.Repository.LocalPath)/.venv
+    displayName: Cache Poetry venv
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: 3.8
+      displayName: Install Python
+  - script: |
+      make poetry-install
+    displayName: Install Poetry
+  - script:
+      poetry install
+    displayName: Install dependencies
+  - script: |
+      make validate-static
+    displayName: Python static checking
+  - script: |
+      make test
+    displayName: Run tests
+  - task: PublishTestResults@2
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFiles: '$(System.DefaultWorkingDirectory)/test-*.xml'
+      testRunTitle: 'Publish test results for Python $(python.version)'
+    displayName: Publish test results
+  - task: PublishCodeCoverageResults@1
+    inputs:
+      codeCoverageTool: Cobertura
+      summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage.xml'
+    displayName: Publish coverage results
